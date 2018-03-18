@@ -1,19 +1,22 @@
 package com.mycompany.termite.model;
 
 import com.fazecast.jSerialComm.SerialPort;
-import java.io.BufferedReader;
+import com.fazecast.jSerialComm.SerialPortEvent;
+import com.fazecast.jSerialComm.SerialPortPacketListener;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
+
+
 public class SimpleSerialPort {
 
     private final SerialPort commPort;
     private final OutputStream outputStream;
+    private Subject<Character> subject;
+    private boolean isListening = false;
 
     public static String[] getPorts() {
         Stream<SerialPort> stream = Arrays.stream(SerialPort.getCommPorts());
@@ -21,17 +24,13 @@ public class SimpleSerialPort {
                 .map((port) -> port.getSystemPortName())
                 .toArray(String[]::new);
     }
-    
-    private final BufferedReader bufferedReader;
 
     public SimpleSerialPort(String portName) throws UnsupportedEncodingException {
         this.commPort = SerialPort.getCommPort(portName);
         this.commPort.openPort();
         this.commPort.setBaudRate(9600);
-        InputStream inputStream = this.commPort.getInputStream();
         this.outputStream = this.commPort.getOutputStream();
-        InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "US-ASCII");
-        bufferedReader = new BufferedReader(inputStreamReader, 1024);
+        this.subject = new Subject<>();
     }
 
     public void write(String s) throws IOException {
@@ -42,8 +41,39 @@ public class SimpleSerialPort {
         }
     }
 
-    public String readLine() throws IOException {
-        while(!bufferedReader.ready()){}
-        return bufferedReader.readLine();
+    public void subscribe(Observer<Character> observer){
+        this.subject.subscribe(observer);
+        this.startListening();
+    }
+
+    private void startListening(){
+        if(!isListening){
+            this.listen();
+            this.isListening = true;
+        }
+    }
+
+    private void listen() {
+        this.commPort.addDataListener(new SerialPortPacketListener() {
+            @Override
+            public int getPacketSize() {
+                return 1;
+            }
+
+            @Override
+            public int getListeningEvents() {
+                return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+            }
+
+            @Override
+            public void serialEvent(SerialPortEvent event) {
+                char c = (char) event.getReceivedData()[0];
+                subject.next(c);
+            }
+        });
+    }
+
+    public void close(){
+        this.commPort.closePort();
     }
 }
