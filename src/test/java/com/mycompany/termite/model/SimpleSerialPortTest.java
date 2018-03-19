@@ -7,6 +7,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import org.junit.Ignore;
 
 public class SimpleSerialPortTest {
 
@@ -16,6 +17,7 @@ public class SimpleSerialPortTest {
         assertEquals(1, portNames.length);
     }
 
+    @Ignore
     @Test
     public void stringIsEchoed() {
         try {
